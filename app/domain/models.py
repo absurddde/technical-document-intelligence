@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
+
+Language = Literal["tr", "en", "mixed", "unknown"]
 
 
 class DocumentStatus(StrEnum):
@@ -75,3 +78,44 @@ class IndexPlanItem:
     existing_document_id: int | None = None
     duplicate_of_path: str | None = None
 
+
+@dataclass(frozen=True, slots=True)
+class ParsedBlock:
+    """One provenance-preserving structural unit extracted from a document."""
+
+    kind: Literal["paragraph", "heading", "table"]
+    text: str
+    page_number: int | None = None
+    section_title: str | None = None
+    heading_path: tuple[str, ...] = ()
+    paragraph_index: int | None = None
+    ocr_used: bool = False
+    ocr_confidence: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedDocument:
+    """Parsed local document and its stable content identity."""
+
+    blocks: tuple[ParsedBlock, ...]
+    document_hash: str
+    pipeline_version: str
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentChunk:
+    """Structure-aware text chunk with retrieval provenance metadata."""
+
+    document_id: str
+    file_name: str
+    file_path: str
+    page_start: int | None
+    page_end: int | None
+    section_title: str | None
+    paragraph_start: int | None
+    paragraph_end: int | None
+    chunk_id: str
+    language: Language
+    text: str
+    ocr_used: bool
+    ocr_confidence: float | None

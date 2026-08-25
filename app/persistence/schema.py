@@ -5,11 +5,11 @@ from __future__ import annotations
 import sqlite3
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def initialize_schema(connection: sqlite3.Connection) -> None:
-    """Create the Phase 1 schema idempotently."""
+    """Create or safely migrate the local schema to the current version."""
 
     connection.executescript(
         """
@@ -71,6 +71,42 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
             last_error_code TEXT,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS parsed_blocks (
+            id INTEGER PRIMARY KEY,
+            document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('paragraph', 'heading', 'table')),
+            text TEXT NOT NULL,
+            page_number INTEGER,
+            section_title TEXT,
+            heading_path TEXT NOT NULL DEFAULT '[]',
+            paragraph_index INTEGER,
+            ocr_used INTEGER NOT NULL DEFAULT 0,
+            ocr_confidence REAL,
+            UNIQUE(document_id, ordinal)
+        );
+
+        CREATE TABLE IF NOT EXISTS chunks (
+            id INTEGER PRIMARY KEY,
+            document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            chunk_id TEXT NOT NULL UNIQUE,
+            ordinal INTEGER NOT NULL,
+            file_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            page_start INTEGER,
+            page_end INTEGER,
+            section_title TEXT,
+            paragraph_start INTEGER,
+            paragraph_end INTEGER,
+            language TEXT NOT NULL CHECK (language IN ('tr', 'en', 'mixed', 'unknown')),
+            text TEXT NOT NULL,
+            ocr_used INTEGER NOT NULL DEFAULT 0,
+            ocr_confidence REAL,
+            UNIQUE(document_id, ordinal)
+        );
+        CREATE INDEX IF NOT EXISTS idx_parsed_blocks_document ON parsed_blocks(document_id);
+        CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
         """
     )
     row = connection.execute("SELECT version FROM schema_info LIMIT 1").fetchone()
@@ -78,6 +114,7 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         connection.execute(
             "INSERT INTO schema_info(version) VALUES (?)", (SCHEMA_VERSION,)
         )
-    elif row[0] != SCHEMA_VERSION:
+    elif row[0] in (1, SCHEMA_VERSION):
+        connection.execute("UPDATE schema_info SET version = ?", (SCHEMA_VERSION,))
+    else:
         raise RuntimeError(f"Unsupported schema version: {row[0]}")
-

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sqlite3
+import json
 from uuid import uuid4
 
-from app.domain.models import Document, DocumentStatus, FileFingerprint, RunStatus
+from app.domain.models import Document, DocumentChunk, DocumentStatus, FileFingerprint, ParsedBlock, RunStatus
 
 
 def _document_from_row(row: sqlite3.Row) -> Document:
@@ -197,3 +198,54 @@ class IndexingRunRepository:
             """,
             (status.value, *values, run_id),
         )
+
+
+class ContentRepository:
+    """Atomically replace and retrieve Phase 2 parsed content and chunks."""
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def replace(self, document: Document, blocks: tuple[ParsedBlock, ...], chunks: tuple[DocumentChunk, ...], pipeline_version: str) -> None:
+        """Replace derived content only after parsing and chunking succeeded."""
+
+        self._connection.execute("DELETE FROM parsed_blocks WHERE document_id = ?", (document.id,))
+        self._connection.execute("DELETE FROM chunks WHERE document_id = ?", (document.id,))
+        self._connection.executemany(
+            """INSERT INTO parsed_blocks(document_id, ordinal, kind, text, page_number,
+               section_title, heading_path, paragraph_index, ocr_used, ocr_confidence)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [(document.id, i, b.kind, b.text, b.page_number, b.section_title,
+              json.dumps(b.heading_path, ensure_ascii=False), b.paragraph_index,
+              int(b.ocr_used), b.ocr_confidence) for i, b in enumerate(blocks)],
+        )
+        self._connection.executemany(
+            """INSERT INTO chunks(document_id, chunk_id, ordinal, file_name, file_path,
+               page_start, page_end, section_title, paragraph_start, paragraph_end,
+               language, text, ocr_used, ocr_confidence)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [(document.id, c.chunk_id, i, c.file_name, c.file_path, c.page_start,
+              c.page_end, c.section_title, c.paragraph_start, c.paragraph_end,
+              c.language, c.text, int(c.ocr_used), c.ocr_confidence)
+             for i, c in enumerate(chunks)],
+        )
+        self._connection.execute(
+            """UPDATE document_index_state SET parse_status='complete', chunk_status='complete',
+               pipeline_version=?, last_error_code=NULL, updated_at=CURRENT_TIMESTAMP
+               WHERE document_id=?""", (pipeline_version, document.id)
+        )
+        self._connection.execute("UPDATE documents SET status='indexed', updated_at=CURRENT_TIMESTAMP WHERE id=?", (document.id,))
+
+    def mark_failed(self, document_id: int, error_code: str, pipeline_version: str) -> None:
+        """Record a privacy-safe per-document failure."""
+
+        self._connection.execute("UPDATE documents SET status='failed', updated_at=CURRENT_TIMESTAMP WHERE id=?", (document_id,))
+        self._connection.execute(
+            """UPDATE document_index_state SET parse_status='failed', chunk_status='pending',
+               pipeline_version=?, last_error_code=?, updated_at=CURRENT_TIMESTAMP WHERE document_id=?""",
+            (pipeline_version, error_code, document_id),
+        )
+
+    def count_chunks(self, document_id: int) -> int:
+        row = self._connection.execute("SELECT COUNT(*) FROM chunks WHERE document_id=?", (document_id,)).fetchone()
+        return int(row[0])

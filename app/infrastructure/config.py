@@ -38,12 +38,39 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ParsingConfig:
+    pipeline_version: str = "phase2-v1"
+    pdf_min_text_characters: int = 40
+    pdf_min_alphanumeric_ratio: float = 0.20
+    remove_repeated_headers_footers: bool = True
+    repeated_margin_lines: int = 2
+    repeated_page_ratio: float = 0.70
+
+
+@dataclass(frozen=True, slots=True)
+class OcrConfig:
+    enabled: bool = True
+    languages: tuple[str, ...] = ("tur", "eng")
+    tesseract_command: str | None = None
+    dpi: int = 300
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkingConfig:
+    chunk_size: int = 1200
+    overlap: int = 150
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Complete typed Phase 1 configuration."""
 
     paths: PathConfig
     indexing: IndexingConfig
     logging: LoggingConfig
+    parsing: ParsingConfig
+    ocr: OcrConfig
+    chunking: ChunkingConfig
 
 
 def load_config(config_path: Path) -> AppConfig:
@@ -62,10 +89,17 @@ def load_config(config_path: Path) -> AppConfig:
 
     indexing = raw.get("indexing", {})
     logging = raw.get("logging", {})
+    parsing = raw.get("parsing", {})
+    ocr = raw.get("ocr", {})
+    chunking = raw.get("chunking", {})
     hash_block_size = int(indexing.get("hash_block_size", 1024 * 1024))
     if hash_block_size <= 0:
         raise ValueError("indexing.hash_block_size must be positive")
 
+    chunk_size = int(chunking.get("chunk_size", 1200))
+    overlap = int(chunking.get("overlap", 150))
+    if chunk_size <= 0 or overlap < 0 or overlap >= chunk_size:
+        raise ValueError("chunking requires chunk_size > overlap >= 0")
     return AppConfig(
         paths=PathConfig(
             **{
@@ -84,5 +118,19 @@ def load_config(config_path: Path) -> AppConfig:
             max_bytes=int(logging.get("max_bytes", 2_000_000)),
             backup_count=int(logging.get("backup_count", 3)),
         ),
+        parsing=ParsingConfig(
+            pipeline_version=str(parsing.get("pipeline_version", "phase2-v1")),
+            pdf_min_text_characters=int(parsing.get("pdf_min_text_characters", 40)),
+            pdf_min_alphanumeric_ratio=float(parsing.get("pdf_min_alphanumeric_ratio", 0.20)),
+            remove_repeated_headers_footers=bool(parsing.get("remove_repeated_headers_footers", True)),
+            repeated_margin_lines=int(parsing.get("repeated_margin_lines", 2)),
+            repeated_page_ratio=float(parsing.get("repeated_page_ratio", 0.70)),
+        ),
+        ocr=OcrConfig(
+            enabled=bool(ocr.get("enabled", True)),
+            languages=tuple(str(value) for value in ocr.get("languages", ["tur", "eng"])),
+            tesseract_command=str(ocr.get("tesseract_command", "")) or None,
+            dpi=int(ocr.get("dpi", 300)),
+        ),
+        chunking=ChunkingConfig(chunk_size=chunk_size, overlap=overlap),
     )
-

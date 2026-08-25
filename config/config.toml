@@ -14,3 +14,20 @@ level = "INFO"
 max_bytes = 2000000
 backup_count = 3
 
+[parsing]
+pipeline_version = "phase2-v1"
+pdf_min_text_characters = 40
+pdf_min_alphanumeric_ratio = 0.20
+remove_repeated_headers_footers = true
+repeated_margin_lines = 2
+repeated_page_ratio = 0.70
+
+[ocr]
+enabled = true
+languages = ["tur", "eng"]
+tesseract_command = ""
+dpi = 300
+
+[chunking]
+chunk_size = 1200
+overlap = 150
