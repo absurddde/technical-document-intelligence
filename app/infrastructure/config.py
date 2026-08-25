@@ -80,6 +80,21 @@ class VectorIndexConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class RetrievalConfig:
+    """Phase 4 hybrid retrieval, fusion, and evidence settings."""
+
+    lexical_top_k: int = 30
+    semantic_top_k: int = 30
+    fused_top_k: int = 30
+    max_context_chunks: int = 8
+    rrf_k: int = 60
+    exact_phrase_boost: float = 0.005
+    acronym_boost: float = 0.005
+    minimum_evidence_threshold: float = 0.01
+    translation_enabled: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Complete typed Phase 1 configuration."""
 
@@ -91,6 +106,7 @@ class AppConfig:
     chunking: ChunkingConfig
     embedding: EmbeddingConfig
     vector_index: VectorIndexConfig
+    retrieval: RetrievalConfig
 
 
 def load_config(config_path: Path) -> AppConfig:
@@ -114,6 +130,7 @@ def load_config(config_path: Path) -> AppConfig:
     chunking = raw.get("chunking", {})
     embedding = raw.get("embedding", {})
     vector_index = raw.get("vector_index", {})
+    retrieval = raw.get("retrieval", {})
     hash_block_size = int(indexing.get("hash_block_size", 1024 * 1024))
     if hash_block_size <= 0:
         raise ValueError("indexing.hash_block_size must be positive")
@@ -132,6 +149,28 @@ def load_config(config_path: Path) -> AppConfig:
     artifact = str(vector_index.get("artifact", "semantic.faiss"))
     if not artifact or Path(artifact).name != artifact:
         raise ValueError("vector_index.artifact must be a file name")
+    retrieval_config = RetrievalConfig(
+        lexical_top_k=int(retrieval.get("lexical_top_k", 30)),
+        semantic_top_k=int(retrieval.get("semantic_top_k", 30)),
+        fused_top_k=int(retrieval.get("fused_top_k", 30)),
+        max_context_chunks=int(retrieval.get("max_context_chunks", 8)),
+        rrf_k=int(retrieval.get("rrf_k", 60)),
+        exact_phrase_boost=float(retrieval.get("exact_phrase_boost", 0.005)),
+        acronym_boost=float(retrieval.get("acronym_boost", 0.005)),
+        minimum_evidence_threshold=float(retrieval.get("minimum_evidence_threshold", 0.01)),
+        translation_enabled=bool(retrieval.get("translation_enabled", False)),
+    )
+    if any(value <= 0 for value in (
+        retrieval_config.lexical_top_k, retrieval_config.semantic_top_k,
+        retrieval_config.fused_top_k, retrieval_config.max_context_chunks,
+        retrieval_config.rrf_k,
+    )):
+        raise ValueError("retrieval top-k, context, and rrf_k values must be positive")
+    if any(value < 0 for value in (
+        retrieval_config.exact_phrase_boost, retrieval_config.acronym_boost,
+        retrieval_config.minimum_evidence_threshold,
+    )):
+        raise ValueError("retrieval boosts and evidence threshold must be non-negative")
     return AppConfig(
         paths=PathConfig(
             **{
@@ -173,4 +212,5 @@ def load_config(config_path: Path) -> AppConfig:
         vector_index=VectorIndexConfig(
             artifact=artifact, version=int(vector_index.get("version", 1))
         ),
+        retrieval=retrieval_config,
     )

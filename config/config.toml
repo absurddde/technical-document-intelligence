@@ -41,3 +41,14 @@ input_format = "raw"
 [vector_index]
 artifact = "semantic.faiss"
 version = 1
+
+[retrieval]
+lexical_top_k = 30
+semantic_top_k = 30
+fused_top_k = 30
+max_context_chunks = 8
+rrf_k = 60
+exact_phrase_boost = 0.005
+acronym_boost = 0.005
+minimum_evidence_threshold = 0.01
+translation_enabled = false
