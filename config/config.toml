@@ -52,3 +52,10 @@ exact_phrase_boost = 0.005
 acronym_boost = 0.005
 minimum_evidence_threshold = 0.01
 translation_enabled = false
+
+[generation]
+temperature = 0.1
+max_context_chunks = 8
+max_output_tokens = 512
+seed = 42
+max_regeneration_attempts = 1

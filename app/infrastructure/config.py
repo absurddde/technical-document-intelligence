@@ -95,6 +95,17 @@ class RetrievalConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class GenerationConfig:
+    """Deterministic grounded generation and retry settings."""
+
+    temperature: float = 0.1
+    max_context_chunks: int = 8
+    max_output_tokens: int = 512
+    seed: int = 42
+    max_regeneration_attempts: int = 1
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Complete typed Phase 1 configuration."""
 
@@ -107,6 +118,7 @@ class AppConfig:
     embedding: EmbeddingConfig
     vector_index: VectorIndexConfig
     retrieval: RetrievalConfig
+    generation: GenerationConfig
 
 
 def load_config(config_path: Path) -> AppConfig:
@@ -131,6 +143,7 @@ def load_config(config_path: Path) -> AppConfig:
     embedding = raw.get("embedding", {})
     vector_index = raw.get("vector_index", {})
     retrieval = raw.get("retrieval", {})
+    generation = raw.get("generation", {})
     hash_block_size = int(indexing.get("hash_block_size", 1024 * 1024))
     if hash_block_size <= 0:
         raise ValueError("indexing.hash_block_size must be positive")
@@ -171,6 +184,19 @@ def load_config(config_path: Path) -> AppConfig:
         retrieval_config.minimum_evidence_threshold,
     )):
         raise ValueError("retrieval boosts and evidence threshold must be non-negative")
+    generation_config = GenerationConfig(
+        temperature=float(generation.get("temperature", 0.1)),
+        max_context_chunks=int(generation.get("max_context_chunks", 8)),
+        max_output_tokens=int(generation.get("max_output_tokens", 512)),
+        seed=int(generation.get("seed", 42)),
+        max_regeneration_attempts=int(generation.get("max_regeneration_attempts", 1)),
+    )
+    if not 0 <= generation_config.temperature <= 1:
+        raise ValueError("generation.temperature must be between 0 and 1")
+    if generation_config.max_context_chunks <= 0 or generation_config.max_output_tokens <= 0:
+        raise ValueError("generation context and output limits must be positive")
+    if generation_config.max_regeneration_attempts < 0:
+        raise ValueError("generation.max_regeneration_attempts must be non-negative")
     return AppConfig(
         paths=PathConfig(
             **{
@@ -213,4 +239,5 @@ def load_config(config_path: Path) -> AppConfig:
             artifact=artifact, version=int(vector_index.get("version", 1))
         ),
         retrieval=retrieval_config,
+        generation=generation_config,
     )
