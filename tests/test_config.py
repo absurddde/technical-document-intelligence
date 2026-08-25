@@ -29,6 +29,8 @@ hash_block_size = 4096
     assert config.paths.database == (tmp_path / "data/database/app.db").resolve()
     assert config.indexing.strict_hash_verification is True
     assert config.indexing.hash_block_size == 4096
+    assert config.embedding.model_path == (tmp_path / "models/embedding/bge-m3").resolve()
+    assert config.embedding.input_format == "raw"
 
 
 def test_load_config_rejects_missing_local_paths(tmp_path: Path) -> None:
@@ -37,4 +39,3 @@ def test_load_config_rejects_missing_local_paths(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Missing path configuration"):
         load_config(path)
-

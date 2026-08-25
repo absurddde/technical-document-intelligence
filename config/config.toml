@@ -31,3 +31,13 @@ dpi = 300
 [chunking]
 chunk_size = 1200
 overlap = 150
+
+[embedding]
+model_path = "models/embedding/bge-m3"
+device = "cpu"
+batch_size = 32
+input_format = "raw"
+
+[vector_index]
+artifact = "semantic.faiss"
+version = 1

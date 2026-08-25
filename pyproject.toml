@@ -11,6 +11,10 @@ dependencies = [
     "pypdfium2>=4.30,<5",
     "python-docx>=1.1,<2",
     "pytesseract>=0.3.13,<0.4",
+    "numpy>=1.26,<3",
+    "sentence-transformers>=3,<6",
+    "transformers>=4.41,<5",
+    "faiss-cpu>=1.8,<2",
 ]
 
 [project.optional-dependencies]
