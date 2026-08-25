@@ -1,0 +1,16 @@
+[paths]
+database = "data/database/app.db"
+indexes = "data/indexes"
+cache = "data/cache"
+logs = "data/logs"
+models = "models"
+
+[indexing]
+strict_hash_verification = true
+hash_block_size = 1048576
+
+[logging]
+level = "INFO"
+max_bytes = 2000000
+backup_count = 3
+

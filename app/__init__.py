@@ -1,0 +1,2 @@
+"""Offline document intelligence application."""
+
