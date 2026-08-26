@@ -196,3 +196,24 @@ class ClaimCoverageValidator:
         }
         if remaining_words:
             raise GenerationValidationError("Answer contains factual text not covered by claims")
+
+
+class TurkishOutputValidator:
+    """Reject clearly English prose while allowing embedded technical terminology."""
+
+    _ENGLISH_MARKERS = frozenset({
+        "the", "and", "using", "with", "from", "during", "system", "estimates",
+        "position", "orientation", "documented", "range", "source", "uses",
+    })
+    _TURKISH_MARKERS = frozenset({
+        "ve", "ile", "bir", "bu", "sistem", "sistemin", "kaynak", "kaynakta",
+        "belgelenen", "belirtilmektedir", "kullanarak", "kullanır", "menzil",
+        "konum", "yönelim", "seyrüsefer", "sırasında", "olarak", "değeri",
+    })
+
+    def validate(self, generation: StructuredGeneration) -> None:
+        words = re.findall(r"[^\W\d_]+", generation.answer.casefold(), re.UNICODE)
+        english = sum(word in self._ENGLISH_MARKERS for word in words)
+        turkish = sum(word in self._TURKISH_MARKERS for word in words)
+        if english >= 2 and english > turkish:
+            raise GenerationValidationError("Answer must be written in Turkish")

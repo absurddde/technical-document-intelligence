@@ -31,6 +31,10 @@ hash_block_size = 4096
     assert config.indexing.hash_block_size == 4096
     assert config.embedding.model_path == (tmp_path / "models/embedding/bge-m3").resolve()
     assert config.embedding.input_format == "raw"
+    assert config.llm.model_path == (
+        tmp_path / "models/llm/qwen3-8b/Qwen3-8B-Q4_K_M.gguf"
+    ).resolve()
+    assert config.llm.n_gpu_layers == 0 and config.llm.n_batch == 128
 
 
 def test_load_config_rejects_missing_local_paths(tmp_path: Path) -> None:

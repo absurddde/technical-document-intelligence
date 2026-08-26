@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9,<10"]
+llm = ["llama-cpp-python>=0.3.35,<0.4"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -106,6 +106,19 @@ class GenerationConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class LlmConfig:
+    """Local llama.cpp runtime settings; no model discovery or downloads."""
+
+    model_path: Path
+    context_size: int = 4096
+    n_batch: int = 128
+    n_gpu_layers: int = 0
+    n_threads: int | None = None
+    use_mmap: bool = True
+    use_mlock: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Complete typed Phase 1 configuration."""
 
@@ -119,6 +132,7 @@ class AppConfig:
     vector_index: VectorIndexConfig
     retrieval: RetrievalConfig
     generation: GenerationConfig
+    llm: LlmConfig
 
 
 def load_config(config_path: Path) -> AppConfig:
@@ -144,6 +158,7 @@ def load_config(config_path: Path) -> AppConfig:
     vector_index = raw.get("vector_index", {})
     retrieval = raw.get("retrieval", {})
     generation = raw.get("generation", {})
+    llm = raw.get("llm", {})
     hash_block_size = int(indexing.get("hash_block_size", 1024 * 1024))
     if hash_block_size <= 0:
         raise ValueError("indexing.hash_block_size must be positive")
@@ -197,6 +212,22 @@ def load_config(config_path: Path) -> AppConfig:
         raise ValueError("generation context and output limits must be positive")
     if generation_config.max_regeneration_attempts < 0:
         raise ValueError("generation.max_regeneration_attempts must be non-negative")
+    llm_config = LlmConfig(
+        model_path=resolve_local_path(
+            base_dir,
+            str(llm.get("model_path", "models/llm/qwen3-8b/Qwen3-8B-Q4_K_M.gguf")),
+        ),
+        context_size=int(llm.get("context_size", 4096)),
+        n_batch=int(llm.get("n_batch", 128)),
+        n_gpu_layers=int(llm.get("n_gpu_layers", 0)),
+        n_threads=(int(llm["n_threads"]) if llm.get("n_threads") is not None else None),
+        use_mmap=bool(llm.get("use_mmap", True)),
+        use_mlock=bool(llm.get("use_mlock", False)),
+    )
+    if llm_config.context_size <= 0 or llm_config.n_batch <= 0:
+        raise ValueError("llm context_size and n_batch must be positive")
+    if llm_config.n_gpu_layers < 0 or (llm_config.n_threads is not None and llm_config.n_threads <= 0):
+        raise ValueError("llm GPU layers and thread count must be non-negative")
     return AppConfig(
         paths=PathConfig(
             **{
@@ -240,4 +271,5 @@ def load_config(config_path: Path) -> AppConfig:
         ),
         retrieval=retrieval_config,
         generation=generation_config,
+        llm=llm_config,
     )

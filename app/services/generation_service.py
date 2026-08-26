@@ -11,7 +11,8 @@ from app.generation.validation import (CitationValidator, ClaimCoverageValidator
                                        ConflictDetector, ConflictValidator,
                                        GenerationValidationError,
                                        NumericClaimValidator,
-                                       StructuredOutputParser)
+                                       StructuredOutputParser,
+                                       TurkishOutputValidator)
 from app.infrastructure.config import GenerationConfig
 from app.retrieval.models import SearchResult
 
@@ -38,6 +39,7 @@ class GenerationService:
         self._conflicts = ConflictDetector()
         self._conflict_validator = ConflictValidator()
         self._coverage = ClaimCoverageValidator()
+        self._turkish = TurkishOutputValidator()
 
     def generate(self, search_result: SearchResult) -> GenerationResult:
         """Validate structured local-LLM output, with at most one configured retry."""
@@ -75,6 +77,7 @@ class GenerationService:
                 generated = self._parser.parse(raw)
                 self._citations.validate(generated, context)
                 self._coverage.validate(generated)
+                self._turkish.validate(generated)
                 self._numbers.validate(generated, context)
                 self._conflict_validator.validate(generated, conflicts)
                 mappings = tuple(

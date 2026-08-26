@@ -29,7 +29,7 @@ class ContextBuilder:
                 f'file_name: {escape(chunk.file_name)}\n'
                 f'page: {page}\n'
                 f'section: {escape(chunk.section_title or "")}\n'
-                f'text:\n{escape(chunk.text)}\n</SOURCE>'
+                f'text:\n{escape(chunk.text, quote=False)}\n</SOURCE>'
             )
         return BuiltContext("\n\n".join(blocks), tuple(sources))
 

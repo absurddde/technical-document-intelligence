@@ -6,7 +6,7 @@ from app.generation.context import ContextBuilder
 from app.generation.models import GeneratedClaim, StructuredGeneration
 from app.generation.validation import (CitationValidator, ConflictDetector,
     ConflictValidator, ClaimCoverageValidator, GenerationValidationError, NumericClaimValidator,
-    StructuredOutputParser, extract_numeric_expressions)
+    StructuredOutputParser, TurkishOutputValidator, extract_numeric_expressions)
 from app.retrieval.models import FusedCandidate
 
 
@@ -46,6 +46,17 @@ def test_answer_text_outside_cited_claims_is_rejected() -> None:
     )
     with pytest.raises(GenerationValidationError, match="not covered"):
         ClaimCoverageValidator().validate(generated)
+
+
+def test_clearly_english_answer_is_rejected_but_technical_terms_are_allowed() -> None:
+    validator = TurkishOutputValidator()
+    with pytest.raises(GenerationValidationError, match="Turkish"):
+        validator.validate(generation(
+            "The system estimates position and orientation using onboard sensors."
+        ))
+    validator.validate(generation(
+        "Sistem, onboard inertial sensors kullanarak konum ve yönelim kestirimi yapar."
+    ))
 
 
 def test_numeric_extraction_and_value_unit_context_validation() -> None:

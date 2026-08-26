@@ -10,7 +10,11 @@ If evidence is insufficient, say so explicitly.
 Write the answer in Turkish as exactly one fluent technical paragraph. Preserve useful source terminology; English technical terms may appear in parentheses.
 Return JSON only with this schema:
 {"answer":"one paragraph","claims":[{"claim_id":"CLAIM_01","text":"supported factual claim","source_ids":["SOURCE_01"]}]}
-Every factual sentence or claim group must appear in claims and must have a non-empty source_ids list."""
+Every factual sentence or claim group must appear in claims and must have a non-empty source_ids list.
+Write both answer and every claim text in Turkish; translate English evidence faithfully without adding information.
+The answer must consist only of the generated Turkish claim text values copied VERBATIM, joined only by punctuation or conjunctions.
+For a simple answer, use one claim whose text is exactly identical to answer. For a conflict, use one verbatim answer segment per conflicting source.
+Do not reveal chain-of-thought, hidden reasoning, analysis, or <think> content. Think silently if needed and emit only the JSON object."""
 
 
 def build_user_prompt(query: str, conflict_summary: str = "",
