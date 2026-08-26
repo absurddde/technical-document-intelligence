@@ -15,7 +15,7 @@ max_bytes = 2000000
 backup_count = 3
 
 [parsing]
-pipeline_version = "phase2-v1"
+pipeline_version = "phase2-v2"
 pdf_min_text_characters = 40
 pdf_min_alphanumeric_ratio = 0.20
 remove_repeated_headers_footers = true

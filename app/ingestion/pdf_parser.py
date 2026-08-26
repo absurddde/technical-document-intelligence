@@ -8,7 +8,8 @@ import re
 from app.domain.models import ParsedBlock, ParsedDocument
 from app.ingestion.errors import DocumentParseError
 from app.ingestion.ocr import OcrEngine
-from app.processing.cleaner import clean_text, remove_repeated_margins
+from app.processing.cleaner import (clean_text, join_hyphenated_line_breaks,
+                                    remove_repeated_margins)
 
 
 class PdfParser:
@@ -68,10 +69,10 @@ class PdfParser:
         for index, native in enumerate(native_pages):
             if self.needs_ocr(native):
                 result = self._ocr_page(path, index)
-                page_texts.append(clean_text(result.text))
+                page_texts.append(clean_text(join_hyphenated_line_breaks(result.text)))
                 ocr_metadata.append((True, result.confidence))
             else:
-                page_texts.append(clean_text(native))
+                page_texts.append(clean_text(join_hyphenated_line_breaks(native)))
                 ocr_metadata.append((False, None))
         if self._remove_margins:
             page_texts = remove_repeated_margins(page_texts, self._margin_lines, self._repeated_ratio)

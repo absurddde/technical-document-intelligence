@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import re
+
 from app.domain.models import Language
 
-_TR = {"ve", "bir", "bu", "için", "ile", "olarak", "sistem", "olan", "de", "da"}
-_EN = {"the", "and", "of", "for", "with", "system", "is", "are", "to", "in"}
+
+_TR = {
+    "ve", "bir", "bu", "için", "ile", "olarak", "olan", "de", "da",
+    "tarafından", "veya",
+}
+_EN = {"the", "and", "of", "for", "with", "is", "are", "to", "in", "from", "or"}
 
 
 def detect_language(text: str) -> Language:
@@ -15,12 +20,14 @@ def detect_language(text: str) -> Language:
     words = re.findall(r"[^\W\d_]+", text.casefold(), flags=re.UNICODE)
     if not words:
         return "unknown"
-    tr = sum(word in _TR for word in words) + sum(any(char in word for char in "çğıöşü") for word in words)
+    tr = sum(word in _TR for word in words) + sum(
+        any(char in word for char in "çğıöşü") for word in words
+    )
     en = sum(word in _EN for word in words)
-    if tr and en:
+    if tr >= 2 and en >= 2 and min(tr, en) / max(tr, en) >= 0.25:
         return "mixed"
-    if tr:
+    if tr > en:
         return "tr"
-    if en:
+    if en > tr:
         return "en"
     return "unknown"

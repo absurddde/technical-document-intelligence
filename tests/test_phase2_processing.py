@@ -9,12 +9,16 @@ from app.persistence.repositories import DocumentRepository
 from app.persistence.schema import initialize_schema
 from app.processing.cache import ParsedDocumentCache
 from app.processing.chunker import StructureAwareChunker
-from app.processing.cleaner import clean_text
+from app.processing.cleaner import clean_text, join_hyphenated_line_breaks
 from app.services.document_processing_service import DocumentProcessingService
 
 
 def test_cleaning_preserves_turkish_and_acronyms() -> None:
     assert clean_text("  Güdüm   sistemi\t INS / EO/IR  ") == "Güdüm sistemi INS / EO/IR"
+
+
+def test_hyphenated_pdf_line_wrap_is_joined_without_guessing_the_word() -> None:
+    assert join_hyphenated_line_breaks("elektronik-\n harbin\nalt sistem") == "elektronik-harbin\nalt sistem"
 
 
 def test_chunk_metadata_and_structural_boundaries() -> None:
@@ -30,6 +34,26 @@ def test_chunk_metadata_and_structural_boundaries() -> None:
     assert chunks[1].ocr_used and chunks[1].ocr_confidence == 87.0
     assert chunks[1].language == "tr"
     assert chunks[1].document_id == "doc-1" and chunks[1].chunk_id
+
+
+def test_overlap_never_pushes_chunk_past_configured_size() -> None:
+    blocks = (
+        ParsedBlock("paragraph", "First short sentence.", page_number=1),
+        ParsedBlock("paragraph", "Second short sentence.", page_number=1),
+        ParsedBlock("paragraph", "X" * 1200, page_number=1),
+    )
+    chunks = StructureAwareChunker(1200, 150).chunk(
+        blocks, document_id="doc-1", file_name="a.pdf", file_path="C:/a.pdf"
+    )
+    assert max(len(chunk.text) for chunk in chunks) <= 1200
+
+
+def test_language_detection_requires_meaningful_evidence_from_both_languages() -> None:
+    from app.processing.language import detect_language
+
+    assert detect_language("The autonomous system is designed for operation in the field.") == "en"
+    assert detect_language("Bu otonom sistem görev için araç üzerinde kullanılır.") == "tr"
+    assert detect_language("Bu sistem görev için kullanılır and the vehicle is autonomous.") == "mixed"
 
 
 def test_cache_is_hash_and_pipeline_version_bound(tmp_path: Path) -> None:

@@ -53,10 +53,13 @@ class StructureAwareChunker:
                 overlap_length = 0
                 if not boundary:
                     for prior in reversed(current):
-                        if overlap_length + len(prior.text) > self._overlap:
+                        proposed = overlap_length + len(prior.text) + (2 if overlap_units else 0)
+                        if proposed > self._overlap:
+                            break
+                        if proposed + len(unit.text) + 2 > self._size:
                             break
                         overlap_units.insert(0, prior)
-                        overlap_length += len(prior.text)
+                        overlap_length = proposed
                 current = overlap_units
                 current_length = overlap_length
             current.append(unit)

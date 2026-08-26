@@ -14,6 +14,12 @@ def clean_text(text: str) -> str:
     return "\n".join(line for line in lines if line).strip()
 
 
+def join_hyphenated_line_breaks(text: str) -> str:
+    """Join word-hyphen line wraps while preserving the source hyphen."""
+
+    return re.sub(r"(?<=\w)-[ \t]*\n[ \t]*(?=\w)", "-", text)
+
+
 def remove_repeated_margins(pages: list[str], margin_lines: int = 2, page_ratio: float = 0.7) -> list[str]:
     """Remove only exact, short lines repeated in the same page-margin position."""
 
