@@ -12,6 +12,17 @@ from app.processing.cleaner import (clean_text, join_hyphenated_line_breaks,
                                     remove_repeated_margins)
 
 
+def render_table_text(table: list[list[object | None]]) -> str:
+    """Render meaningful table rows while ignoring empty decorative grids."""
+
+    rows: list[str] = []
+    for row in table:
+        cells = [clean_text(str(cell or "")) for cell in row]
+        if any(cells):
+            rows.append(" | ".join(cells))
+    return clean_text("\n".join(rows))
+
+
 class PdfParser:
     """Extract page provenance and OCR only pages with insufficient native text."""
 
@@ -87,8 +98,7 @@ class PdfParser:
                     blocks.append(ParsedBlock("paragraph", cleaned, page_index + 1, paragraph_index=paragraph_index, ocr_used=used, ocr_confidence=confidence))
                     paragraph_index += 1
             for table in tables[page_index]:
-                rows = [" | ".join(clean_text(str(cell or "")) for cell in row) for row in table]
-                table_text = clean_text("\n".join(rows))
+                table_text = render_table_text(table)
                 if table_text:
                     blocks.append(ParsedBlock("table", table_text, page_index + 1, paragraph_index=paragraph_index, ocr_used=False))
                     paragraph_index += 1

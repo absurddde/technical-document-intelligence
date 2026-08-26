@@ -8,7 +8,7 @@ from docx import Document
 from app.ingestion.docx_parser import DocxParser
 from app.ingestion.errors import DocumentParseError, OcrUnavailableError
 from app.ingestion.ocr import TesseractOcr
-from app.ingestion.pdf_parser import PdfParser
+from app.ingestion.pdf_parser import PdfParser, render_table_text
 
 
 def _write_text_pdf(path: Path, page_texts: list[str]) -> Path:
@@ -54,6 +54,13 @@ def test_ocr_fallback_decision_is_page_threshold_based() -> None:
     assert parser.needs_ocr("  12 ")
     assert parser.needs_ocr("---------- enough length ----------")
     assert not parser.needs_ocr("Technical INS content")
+
+
+def test_empty_decorative_table_grid_is_dropped_but_real_rows_are_preserved() -> None:
+    assert render_table_text([[None, "", None], ["", None, ""]]) == ""
+    assert render_table_text([["Parameter", "Value"], ["Range", "150 km"]]) == (
+        "Parameter | Value\nRange | 150 km"
+    )
 
 
 def test_broken_pdf_raises_safe_error(tmp_path: Path) -> None:
