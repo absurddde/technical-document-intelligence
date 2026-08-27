@@ -8,7 +8,15 @@ from docx import Document
 from app.ingestion.docx_parser import DocxParser
 from app.ingestion.errors import DocumentParseError, OcrUnavailableError
 from app.ingestion.ocr import TesseractOcr
-from app.ingestion.pdf_parser import PdfParser, render_table_text
+from app.ingestion.pdf_parser import PdfParser, order_words_by_columns, render_table_text
+
+
+def _word(text: str, x0: float, x1: float, top: float, height: float = 10.0) -> dict[str, object]:
+    return {"text": text, "x0": x0, "x1": x1, "top": top, "bottom": top + height}
+
+
+def _column_words(prefix: str, x0: float, x1: float) -> list[dict[str, object]]:
+    return [_word(f"{prefix}{index}", x0, x1, 80.0 + index * 15) for index in range(8)]
 
 
 def _write_text_pdf(path: Path, page_texts: list[str]) -> Path:
@@ -61,6 +69,33 @@ def test_empty_decorative_table_grid_is_dropped_but_real_rows_are_preserved() ->
     assert render_table_text([["Parameter", "Value"], ["Range", "150 km"]]) == (
         "Parameter | Value\nRange | 150 km"
     )
+
+
+def test_clear_two_column_words_are_ordered_column_major() -> None:
+    words = _column_words("L", 40, 270) + _column_words("R", 330, 560)
+    text = order_words_by_columns(words, 600)
+    assert text is not None
+    assert text.index("L7") < text.index("R0")
+
+
+def test_single_column_words_keep_native_extraction_path() -> None:
+    words = [_word(f"line{index}", 40, 560, 40 + index * 15) for index in range(12)]
+    assert order_words_by_columns(words, 600) is None
+
+
+def test_full_width_heading_precedes_two_columns() -> None:
+    heading = [_word("FULL_HEADING", 80, 520, 25, 18)]
+    words = heading + _column_words("L", 40, 270) + _column_words("R", 330, 560)
+    text = order_words_by_columns(words, 600)
+    assert text is not None
+    assert text.splitlines()[0] == "FULL_HEADING"
+    assert text.index("L7") < text.index("R0")
+
+
+def test_weak_gutter_evidence_does_not_split_page() -> None:
+    words = [_word(f"line{index}", 40, 560, 40 + index * 15) for index in range(11)]
+    words.append(_word("short", 40, 270, 220))
+    assert order_words_by_columns(words, 600) is None
 
 
 def test_broken_pdf_raises_safe_error(tmp_path: Path) -> None:
