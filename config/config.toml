@@ -51,6 +51,7 @@ rrf_k = 60
 exact_phrase_boost = 0.005
 acronym_boost = 0.005
 minimum_evidence_threshold = 0.01
+minimum_semantic_score = 0.50
 translation_enabled = false
 
 [generation]

@@ -55,9 +55,24 @@ class SearchService:
         selected = self._selector.select(
             fused[:self._config.fused_top_k], self._config.max_context_chunks
         )
+        semantic_scores = [
+            hit.score for branch, hits in branches if branch.endswith("semantic")
+            for hit in hits
+        ]
+        has_direct_lexical_signal = any(
+            candidate.exact_phrase_boost > 0 or candidate.acronym_boost > 0
+            for candidate in selected
+        )
         insufficient = (
             not selected
             or selected[0].fused_score < self._config.minimum_evidence_threshold
+            or (
+                not has_direct_lexical_signal
+                and (
+                    not semantic_scores
+                    or max(semantic_scores) < self._config.minimum_semantic_score
+                )
+            )
         )
         details = tuple(self._detail(candidate) for candidate in selected)
         return SearchResult(

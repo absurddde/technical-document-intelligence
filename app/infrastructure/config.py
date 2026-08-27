@@ -91,6 +91,7 @@ class RetrievalConfig:
     exact_phrase_boost: float = 0.005
     acronym_boost: float = 0.005
     minimum_evidence_threshold: float = 0.01
+    minimum_semantic_score: float = 0.50
     translation_enabled: bool = False
 
 
@@ -186,6 +187,7 @@ def load_config(config_path: Path) -> AppConfig:
         exact_phrase_boost=float(retrieval.get("exact_phrase_boost", 0.005)),
         acronym_boost=float(retrieval.get("acronym_boost", 0.005)),
         minimum_evidence_threshold=float(retrieval.get("minimum_evidence_threshold", 0.01)),
+        minimum_semantic_score=float(retrieval.get("minimum_semantic_score", 0.50)),
         translation_enabled=bool(retrieval.get("translation_enabled", False)),
     )
     if any(value <= 0 for value in (
@@ -196,9 +198,11 @@ def load_config(config_path: Path) -> AppConfig:
         raise ValueError("retrieval top-k, context, and rrf_k values must be positive")
     if any(value < 0 for value in (
         retrieval_config.exact_phrase_boost, retrieval_config.acronym_boost,
-        retrieval_config.minimum_evidence_threshold,
+        retrieval_config.minimum_evidence_threshold, retrieval_config.minimum_semantic_score,
     )):
         raise ValueError("retrieval boosts and evidence threshold must be non-negative")
+    if retrieval_config.minimum_semantic_score > 1:
+        raise ValueError("retrieval.minimum_semantic_score must not exceed 1")
     generation_config = GenerationConfig(
         temperature=float(generation.get("temperature", 0.1)),
         max_context_chunks=int(generation.get("max_context_chunks", 8)),

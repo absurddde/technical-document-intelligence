@@ -70,3 +70,11 @@ def test_retrieval_details_and_evidence_threshold() -> None:
     assert detail.lexical_score == -3 and detail.semantic_score == .88
     assert detail.acronym_boost > 0 and detail.rrf_score > 0
     assert detail.page_start == 2 and detail.section_title == "Systems"
+
+
+def test_low_semantic_similarity_is_insufficient_despite_rrf_rank() -> None:
+    lexical = RecordingRetriever({'"orchids"': (hit("lexical", -1, "unrelated orchids"),)})
+    semantic = RecordingRetriever({"orchids": (hit("semantic", .40, "weak neighbor"),)})
+    result = SearchService(lexical, semantic, config()).search("orchids")
+    assert result.selected
+    assert result.insufficient_evidence is True
