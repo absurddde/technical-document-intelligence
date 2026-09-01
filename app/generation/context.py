@@ -11,10 +11,15 @@ from app.retrieval.models import FusedCandidate
 class ContextBuilder:
     """Render only selected chunks and map deterministic request-local IDs."""
 
-    def build(self, chunks: tuple[FusedCandidate, ...], maximum: int) -> BuiltContext:
+    def build(self, chunks: tuple[FusedCandidate, ...], maximum: int,
+              maximum_characters: int | None = None) -> BuiltContext:
         sources: list[SourceRecord] = []
         blocks: list[str] = []
         for index, chunk in enumerate(chunks[:maximum], 1):
+            if maximum_characters is not None and sources:
+                used = sum(len(source.text) for source in sources)
+                if used + len(chunk.text) > maximum_characters:
+                    break
             source_id = f"SOURCE_{index:02d}"
             source = SourceRecord(
                 source_id, chunk.chunk_id, chunk.document_id, chunk.file_name,

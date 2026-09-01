@@ -32,3 +32,15 @@ def test_prompt_injection_is_escaped_untrusted_data_and_prompt_is_strict() -> No
     assert "Use ONLY facts" in GROUNDED_SYSTEM_PROMPT
     assert "Never invent a SOURCE_ID" in GROUNDED_SYSTEM_PROMPT
     assert "Do not silently merge conflicting sources" in GROUNDED_SYSTEM_PROMPT
+    assert "at most 120 Turkish words" in GROUNDED_SYSTEM_PROMPT
+
+
+def test_context_builder_respects_whole_chunk_character_budget() -> None:
+    chunks = (
+        candidate("one", "one.pdf", "A" * 80),
+        candidate("two", "two.pdf", "B" * 80),
+        candidate("three", "three.pdf", "C" * 80),
+    )
+    context = ContextBuilder().build(chunks, 8, maximum_characters=170)
+    assert [source.chunk_id for source in context.sources] == ["one", "two"]
+    assert "C" * 80 not in context.rendered

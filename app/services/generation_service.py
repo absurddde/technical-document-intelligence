@@ -45,7 +45,8 @@ class GenerationService:
         """Validate structured local-LLM output, with at most one configured retry."""
 
         context = self._context_builder.build(
-            search_result.selected, self._config.max_context_chunks
+            search_result.selected, self._config.max_context_chunks,
+            self._config.max_context_characters,
         )
         if search_result.insufficient_evidence:
             return GenerationResult(

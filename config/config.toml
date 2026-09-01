@@ -60,6 +60,7 @@ max_context_chunks = 8
 max_output_tokens = 512
 seed = 42
 max_regeneration_attempts = 1
+max_context_characters = 6000
 
 [llm]
 model_path = "models/llm/qwen3-8b/Qwen3-8B-Q4_K_M.gguf"

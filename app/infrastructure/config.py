@@ -104,6 +104,7 @@ class GenerationConfig:
     max_output_tokens: int = 512
     seed: int = 42
     max_regeneration_attempts: int = 1
+    max_context_characters: int = 6000
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,6 +210,7 @@ def load_config(config_path: Path) -> AppConfig:
         max_output_tokens=int(generation.get("max_output_tokens", 512)),
         seed=int(generation.get("seed", 42)),
         max_regeneration_attempts=int(generation.get("max_regeneration_attempts", 1)),
+        max_context_characters=int(generation.get("max_context_characters", 6000)),
     )
     if not 0 <= generation_config.temperature <= 1:
         raise ValueError("generation.temperature must be between 0 and 1")
@@ -216,6 +218,8 @@ def load_config(config_path: Path) -> AppConfig:
         raise ValueError("generation context and output limits must be positive")
     if generation_config.max_regeneration_attempts < 0:
         raise ValueError("generation.max_regeneration_attempts must be non-negative")
+    if generation_config.max_context_characters <= 0:
+        raise ValueError("generation.max_context_characters must be positive")
     llm_config = LlmConfig(
         model_path=resolve_local_path(
             base_dir,
