@@ -15,6 +15,8 @@ class IncrementalIndexPlanner:
         self,
         discovered: Iterable[FileFingerprint],
         existing: Iterable[Document],
+        *,
+        include_missing: bool = True,
     ) -> tuple[IndexPlanItem, ...]:
         """Classify current and missing paths without parsing their contents."""
 
@@ -24,10 +26,19 @@ class IncrementalIndexPlanner:
         for fingerprint in current.values():
             hash_groups[fingerprint.sha256].append(fingerprint)
 
+        existing_canonical_for_hash = {
+            item.sha256: item.canonical_path
+            for item in previous.values()
+            if item.status.value not in {"duplicate", "missing"}
+        }
         canonical_for_hash = {
             sha256: min(group, key=lambda item: item.canonical_path).canonical_path
             for sha256, group in hash_groups.items()
         }
+        canonical_for_hash.update({
+            sha256: path for sha256, path in existing_canonical_for_hash.items()
+            if sha256 in hash_groups
+        })
 
         plan: list[IndexPlanItem] = []
         for path in sorted(current):
@@ -53,15 +64,15 @@ class IncrementalIndexPlanner:
                 )
             )
 
-        for path in sorted(set(previous) - set(current)):
-            old = previous[path]
-            plan.append(
-                IndexPlanItem(
-                    action=IndexAction.MISSING,
-                    canonical_path=path,
-                    fingerprint=None,
-                    existing_document_id=old.id,
+        if include_missing:
+            for path in sorted(set(previous) - set(current)):
+                old = previous[path]
+                plan.append(
+                    IndexPlanItem(
+                        action=IndexAction.MISSING,
+                        canonical_path=path,
+                        fingerprint=None,
+                        existing_document_id=old.id,
+                    )
                 )
-            )
         return tuple(plan)
-

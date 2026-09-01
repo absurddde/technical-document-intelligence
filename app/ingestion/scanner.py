@@ -49,9 +49,28 @@ class FolderScanner:
             ),
             key=canonicalize_path,
         )
+        return self.scan_paths(tuple(paths))
+
+    def scan_paths(self, paths: tuple[Path, ...]) -> ScanResult:
+        """Fingerprint an explicit set of supported local document paths."""
+
+        unique_paths = sorted(
+            {path.expanduser().resolve(strict=True) for path in paths},
+            key=canonicalize_path,
+        )
+        unsupported = [
+            path for path in unique_paths
+            if path.suffix.lower() not in {".pdf", ".docx"}
+        ]
+        if unsupported:
+            raise ValueError(f"Unsupported document type: {unsupported[0].suffix or unsupported[0].name}")
+
         fingerprints: list[FileFingerprint] = []
         failures: list[ScanFailure] = []
-        for path in paths:
+        for path in unique_paths:
+            if not path.is_file():
+                failures.append(ScanFailure(canonicalize_path(path), "NotAFileError"))
+                continue
             try:
                 fingerprints.append(
                     fingerprint_file(path, block_size=self._hash_block_size)
@@ -65,4 +84,3 @@ class FolderScanner:
                     type(error).__name__,
                 )
         return ScanResult(tuple(fingerprints), tuple(failures))
-

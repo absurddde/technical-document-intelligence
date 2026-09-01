@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.domain.models import DocumentStatus, IndexAction, IndexPlanItem, RunStatus
 from app.indexing.planner import IncrementalIndexPlanner
-from app.ingestion.scanner import FolderScanner
+from app.ingestion.scanner import FolderScanner, ScanResult
 from app.infrastructure.paths import canonicalize_path
 from app.persistence.connection import Database
 from app.persistence.repositories import DocumentRepository, IndexingRunRepository
@@ -26,12 +26,27 @@ class InventoryService:
         """Run strict-hash discovery and atomically update inventory metadata."""
 
         scan = self._scanner.scan(root)
+        return self._persist_scan(scan, canonicalize_path(root), include_missing=True)
+
+    def inventory_files(self, paths: tuple[Path, ...]) -> tuple[IndexPlanItem, ...]:
+        """Inventory explicit files selected by a desktop user."""
+
+        scan = self._scanner.scan_paths(paths)
+        root_label = canonicalize_path(paths[0].parent) if paths else "<explicit-files>"
+        return self._persist_scan(scan, root_label, include_missing=False)
+
+    def _persist_scan(self, scan: ScanResult, root_label: str, *,
+                      include_missing: bool) -> tuple[IndexPlanItem, ...]:
+        """Persist one scanner result through the shared incremental planner."""
+
         with self._database.transaction() as connection:
             initialize_schema(connection)
             documents = DocumentRepository(connection)
             runs = IndexingRunRepository(connection)
-            run_id = runs.start(canonicalize_path(root))
-            plan = self._planner.build_plan(scan.fingerprints, documents.list_all())
+            run_id = runs.start(root_label)
+            plan = self._planner.build_plan(
+                scan.fingerprints, documents.list_all(), include_missing=include_missing
+            )
 
             canonical_ids: dict[str, int] = {}
             for item in plan:
