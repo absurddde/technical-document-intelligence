@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import tomllib
 
-from app.infrastructure.paths import resolve_local_path
+from app.infrastructure.paths import RuntimePaths, resolve_local_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,4 +280,23 @@ def load_config(config_path: Path) -> AppConfig:
         retrieval=retrieval_config,
         generation=generation_config,
         llm=llm_config,
+    )
+
+
+def apply_runtime_paths(config: AppConfig, runtime: RuntimePaths) -> AppConfig:
+    """Route mutable data and external models for the selected runtime mode."""
+
+    if not runtime.packaged:
+        return config
+    return replace(
+        config,
+        paths=PathConfig(
+            database=runtime.database, indexes=runtime.indexes,
+            cache=runtime.cache, logs=runtime.logs, models=runtime.models,
+        ),
+        embedding=replace(config.embedding, model_path=runtime.models / "embedding" / "bge-m3"),
+        llm=replace(
+            config.llm,
+            model_path=runtime.models / "llm" / "qwen3-8b" / "Qwen3-8B-Q4_K_M.gguf",
+        ),
     )

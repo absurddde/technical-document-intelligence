@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from app.infrastructure.config import load_config
+from app.infrastructure.config import apply_runtime_paths, load_config
+from app.infrastructure.health import (
+    format_health_problems, run_startup_health, with_discovered_tesseract,
+)
 from app.infrastructure.logging import configure_logging
+from app.infrastructure.paths import discover_runtime_paths, enforce_offline_environment
 from app.ui.backend import LocalBackendFacade
 from app.ui.main_window import MainWindow
 
@@ -16,9 +20,15 @@ from app.ui.main_window import MainWindow
 def main() -> int:
     """Start the fully local Phase 6 desktop application."""
 
-    root = Path(__file__).resolve().parents[2]
+    runtime = discover_runtime_paths()
+    enforce_offline_environment()
+    smoke_test = "--smoke-test" in sys.argv
+    if smoke_test:
+        sys.argv.remove("--smoke-test")
     application = QApplication(sys.argv)
-    application.setApplicationName("Yerel Teknik Doküman Zekâsı")
+    application.setApplicationName("Technical Document Intelligence")
+    application.setApplicationDisplayName("Technical Document Intelligence")
+    application.setOrganizationName("TechnicalDocumentIntelligence")
     application.setStyleSheet("""
         QWidget { font-family: "Segoe UI"; font-size: 10pt; }
         QLabel#title { font-size: 20pt; font-weight: 600; }
@@ -31,13 +41,24 @@ def main() -> int:
         }
     """)
     try:
-        config = load_config(root / "config/config.toml")
+        config = apply_runtime_paths(load_config(runtime.config_file), runtime)
+        config = with_discovered_tesseract(config, runtime)
         configure_logging(config.paths.logs, config.logging)
+        health = run_startup_health(config, runtime)
         window = MainWindow(LocalBackendFacade(config))
     except Exception as error:
         QMessageBox.critical(None, "Başlatma hatası", str(error))
         return 1
     window.show()
+    problems = format_health_problems(health)
+    if problems and not smoke_test:
+        QMessageBox.warning(
+            window, "Startup health check",
+            "Some local components are unavailable. Affected operations may fail:\n\n"
+            + problems,
+        )
+    if smoke_test:
+        QTimer.singleShot(1000, application.quit)
     return application.exec()
 
 

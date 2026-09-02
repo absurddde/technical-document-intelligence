@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
         self._logger = logging.getLogger("document_intelligence.ui")
         self._elapsed_timer = QTimer(self)
         self._elapsed_timer.timeout.connect(self._tick_elapsed)
-        self.setWindowTitle("Yerel Teknik Doküman Zekâsı")
+        self.setWindowTitle("Technical Document Intelligence")
         self.resize(1280, 820)
         self.setMinimumSize(980, 640)
         self._build_ui()
@@ -334,6 +334,20 @@ class MainWindow(QMainWindow):
             self.operation_label.setText(
                 "İptal istendi; güvenli aşama bekleniyor. Aktif model çağrısı kesilmeyecektir."
             )
+
+    def closeEvent(self, event) -> None:
+        """Request cooperative cancellation before allowing shutdown."""
+
+        if self._worker is not None:
+            self._worker.cancel()
+            QMessageBox.information(
+                self, "Operation still active",
+                "Cancellation was requested. Close the application after the current "
+                "safe operation boundary is reached.",
+            )
+            event.ignore()
+            return
+        event.accept()
 
     def _set_stage(self, text: str) -> None:
         self.operation_label.setText(text)
