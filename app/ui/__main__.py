@@ -17,6 +17,21 @@ from app.ui.backend import LocalBackendFacade
 from app.ui.main_window import MainWindow
 
 
+APPLICATION_STYLESHEET = """
+        QWidget { font-family: "Segoe UI"; font-size: 10pt; }
+        QLabel#title { font-size: 20pt; font-weight: 600; }
+        QLabel#subtitle, QLabel#hint { color: #5f6b76; }
+        QPushButton { padding: 7px 12px; }
+        QPushButton#primary { background: #1769aa; color: white; border: 0; border-radius: 4px; }
+        QPushButton#primary:disabled { background: #9aa7b2; }
+        QPlainTextEdit, QTextBrowser, QTableWidget, QListWidget, QTreeWidget {
+            border: 1px solid #cbd3da; border-radius: 4px;
+        }
+        QPlainTextEdit, QTextBrowser, QListWidget, QTreeWidget {
+            background: white;
+        }
+    """
+
 def main() -> int:
     """Start the fully local Phase 6 desktop application."""
 
@@ -29,17 +44,7 @@ def main() -> int:
     application.setApplicationName("Technical Document Intelligence")
     application.setApplicationDisplayName("Technical Document Intelligence")
     application.setOrganizationName("TechnicalDocumentIntelligence")
-    application.setStyleSheet("""
-        QWidget { font-family: "Segoe UI"; font-size: 10pt; }
-        QLabel#title { font-size: 20pt; font-weight: 600; }
-        QLabel#subtitle, QLabel#hint { color: #5f6b76; }
-        QPushButton { padding: 7px 12px; }
-        QPushButton#primary { background: #1769aa; color: white; border: 0; border-radius: 4px; }
-        QPushButton#primary:disabled { background: #9aa7b2; }
-        QPlainTextEdit, QTextBrowser, QTableWidget, QListWidget, QTreeWidget {
-            border: 1px solid #cbd3da; border-radius: 4px; background: white;
-        }
-    """)
+    application.setStyleSheet(APPLICATION_STYLESHEET)
     try:
         config = apply_runtime_paths(load_config(runtime.config_file), runtime)
         config = with_discovered_tesseract(config, runtime)

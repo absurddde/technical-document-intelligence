@@ -192,6 +192,7 @@ class MainWindow(QMainWindow):
 
     def _documents_registered(self, _: Any) -> None:
         self.refresh_documents()
+        self._set_stage("Belgeler kaydedildi. İndekslemeye hazır.")
 
     def refresh_documents(self) -> None:
         try:

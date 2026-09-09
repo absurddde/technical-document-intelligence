@@ -8,7 +8,7 @@ import threading
 
 from app.generation.llm import LlamaCppGgufBackend
 from app.infrastructure.config import AppConfig
-from app.infrastructure.paths import ensure_local_directories
+from app.infrastructure.paths import canonicalize_path, ensure_local_directories
 from app.ingestion.docx_parser import DocxParser
 from app.ingestion.ocr import TesseractOcr
 from app.ingestion.pdf_parser import PdfParser
@@ -111,7 +111,7 @@ class LocalBackendFacade:
             parameters: tuple[str, ...] = ()
             where = ""
             if paths:
-                values = tuple(str(path.resolve(strict=False)) for path in paths)
+                values = tuple(canonicalize_path(path) for path in paths)
                 where = f"WHERE d.canonical_path IN ({','.join('?' for _ in values)})"
                 parameters = values
             rows = connection.execute(
