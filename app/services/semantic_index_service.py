@@ -132,6 +132,23 @@ class SemanticIndexService:
         temporary.with_suffix(temporary.suffix + ".meta").replace(
             self._artifact.with_suffix(self._artifact.suffix + ".meta")
         )
+        # Publish completion only after both local artifacts were saved successfully.
+        with self._database.transaction() as connection:
+            connection.execute(
+                """UPDATE document_index_state
+                   SET embedding_status='complete', vector_status='complete',
+                       updated_at=CURRENT_TIMESTAMP
+                   WHERE document_id IN (SELECT id FROM documents WHERE status='indexed')
+                     AND parse_status='complete' AND chunk_status='complete'
+                     AND NOT EXISTS (
+                         SELECT 1 FROM chunks c LEFT JOIN vector_index_metadata v
+                         ON v.chunk_id=c.chunk_id
+                         WHERE c.document_id=document_index_state.document_id
+                           AND (v.chunk_id IS NULL OR v.model_fingerprint<>?
+                                OR v.vector_dimension<>?)
+                     )""",
+                (self._backend.model_fingerprint, self._backend.dimension),
+            )
         return SemanticIndexResult(embedded, reused, removed, total)
 
     def _upsert(self, connection: sqlite3.Connection, chunk_id: str, vector_id: int,

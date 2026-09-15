@@ -36,15 +36,30 @@ class DocumentProcessingService:
         self._logger = logging.getLogger("document_intelligence.processing")
 
     def process(self, plan: tuple[IndexPlanItem, ...]) -> ProcessingResult:
-        """Skip unchanged/duplicate paths and continue after malformed documents."""
+        """Resume incomplete content stages and skip completed unchanged paths."""
 
         processed = skipped = failed = 0
         for item in plan:
-            if item.action not in {IndexAction.NEW, IndexAction.MODIFIED} or item.fingerprint is None:
+            if item.action not in {IndexAction.NEW, IndexAction.MODIFIED, IndexAction.UNCHANGED} or item.fingerprint is None:
                 skipped += 1
                 continue
             fingerprint = item.fingerprint
             try:
+                if item.action is IndexAction.UNCHANGED:
+                    with self._database.connect() as connection:
+                        state = connection.execute(
+                            """SELECT d.status, s.parse_status, s.chunk_status,
+                                      s.lexical_status, s.pipeline_version
+                               FROM documents d LEFT JOIN document_index_state s
+                               ON s.document_id=d.id WHERE d.canonical_path=?""",
+                            (fingerprint.canonical_path,),
+                        ).fetchone()
+                    # Semantic stages resume independently from persisted chunks.
+                    if state and tuple(state) == (
+                        "indexed", "complete", "complete", "complete", self._version,
+                    ):
+                        skipped += 1
+                        continue
                 parsed = self._cache.load(fingerprint.sha256, self._version)
                 if parsed is None:
                     parsed = self._parsers[fingerprint.file_type].parse(fingerprint.path, fingerprint.sha256)

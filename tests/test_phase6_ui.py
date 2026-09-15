@@ -148,6 +148,108 @@ def config(tmp_path: Path) -> AppConfig:
     )
 
 
+def test_registered_pdf_indexes_then_skips_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exercise Add Document followed by the selected-file indexing backend."""
+    from unittest.mock import patch
+    from tests.test_phase2_parsing import _write_text_pdf
+    from tests.test_phase3_semantic_service import FakeBackend
+    from app.retrieval.lexical_index import SQLiteLexicalIndex
+    from app.retrieval.vector_index import FaissVectorIndex
+
+    path = _write_text_pdf(tmp_path / "guide.pdf", [
+        "Navigation guidance uses local sensors to estimate vehicle position and heading."
+    ])
+    facade = LocalBackendFacade(config(tmp_path))
+    embedding = FakeBackend()
+    monkeypatch.setattr(facade, "_embedding_backend", lambda: embedding)
+    registered = facade.register_documents((path,))
+    assert len(registered) == 1 and registered[0].status == "discovered"
+    state_query = (
+        "SELECT parse_status,chunk_status,embedding_status,lexical_status,vector_status "
+        "FROM document_index_state"
+    )
+    with facade.database.connect() as connection:
+        assert tuple(connection.execute(state_query).fetchone()) == ("pending",) * 5
+
+    with patch.object(ui_backend.PdfParser, "parse", autospec=True,
+                      side_effect=ui_backend.PdfParser.parse) as parser:
+        result = facade.index_documents((path,), lambda _: None, lambda: False)
+        assert result["processed"] == 1 and result["failed"] == 0
+        assert result["embedded"] > 0 and result["total"] > 0
+        assert parser.call_count == 1
+        with facade.database.connect() as connection:
+            assert tuple(connection.execute(state_query).fetchone()) == ("complete",) * 5
+            assert connection.execute("SELECT status FROM documents").fetchone()[0] == "indexed"
+            assert connection.execute("SELECT COUNT(*) FROM parsed_blocks").fetchone()[0] > 0
+            assert SQLiteLexicalIndex(connection).search("Navigation")
+            chunks = [tuple(row) for row in connection.execute("SELECT * FROM chunks")]
+            assert chunks
+        assert facade.list_documents()[0].status == "indexed"
+        assert facade.index_artifact.is_file()
+        index = FaissVectorIndex.load(
+            facade.index_artifact, dimension=embedding.dimension,
+            model_fingerprint=embedding.model_fingerprint,
+        )
+        assert index.search(embedding.embed_query("Navigation"), 1)
+        calls = len(embedding.calls)
+        again = facade.index_documents((path,), lambda _: None, lambda: False)
+        assert again["processed"] == 0 and again["skipped"] == 1
+        assert again["embedded"] == 0 and again["failed"] == 0
+        assert len(embedding.calls) == calls and parser.call_count == 1
+        with facade.database.connect() as connection:
+            assert [tuple(row) for row in connection.execute("SELECT * FROM chunks")] == chunks
+
+
+@pytest.mark.parametrize("stage_name", [
+    "parse_status", "chunk_status", "lexical_status", "embedding_status", "vector_status",
+    "pipeline_version",
+])
+@pytest.mark.parametrize("incomplete", ["pending", "failed", "incomplete"])
+def test_unchanged_pdf_resumes_incomplete_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage_name: str, incomplete: str,
+) -> None:
+    """Recover each persisted stage while retaining cached embeddings and duplicates."""
+    from tests.test_phase2_parsing import _write_text_pdf
+    from tests.test_phase3_semantic_service import FakeBackend
+
+    path = _write_text_pdf(tmp_path / "guide.pdf", [
+        "Navigation guidance uses local sensors to estimate vehicle position and heading."
+    ])
+    facade = LocalBackendFacade(config(tmp_path))
+    embedding = FakeBackend()
+    monkeypatch.setattr(facade, "_embedding_backend", lambda: embedding)
+    facade.register_documents((path,))
+    facade.index_documents((path,), lambda _: None, lambda: False)
+    calls = len(embedding.calls)
+    with facade.database.transaction() as connection:
+        connection.execute(f"UPDATE document_index_state SET {stage_name}=?", (incomplete,))
+        if stage_name == "parse_status" and incomplete == "failed":
+            connection.execute("UPDATE documents SET status='failed'")
+        if stage_name == "vector_status":
+            connection.execute("DELETE FROM vector_index_metadata")
+    if stage_name == "vector_status":
+        facade.index_artifact.unlink()
+    copy = tmp_path / "copy.pdf"
+    copy.write_bytes(path.read_bytes())
+    facade.register_documents((copy,))
+    result = facade.index_documents((path, copy), lambda _: None, lambda: False)
+    assert result["failed"] == 0
+    assert result["processed"] == (0 if stage_name in {"embedding_status", "vector_status"} else 1)
+    assert result["embedded"] == 0 and len(embedding.calls) == calls
+    with facade.database.connect() as connection:
+        state = connection.execute(
+            "SELECT parse_status,chunk_status,lexical_status,embedding_status,vector_status,"
+            "pipeline_version FROM document_index_state s JOIN documents d ON d.id=s.document_id "
+            "WHERE d.status='indexed'"
+        ).fetchone()
+        assert tuple(state) == ("complete",) * 5 + (facade.config.parsing.pipeline_version,)
+        assert connection.execute("SELECT COUNT(*) FROM documents WHERE status='duplicate'").fetchone()[0] == 1
+    again = facade.index_documents((path, copy), lambda _: None, lambda: False)
+    assert again["processed"] == 0 and again["skipped"] == 2 and again["embedded"] == 0
+
+
 def candidate() -> FusedCandidate:
     return FusedCandidate(
         "chunk-1", "doc-1", "guide.pdf", "Ataletsel sistem konumu kestirir.",

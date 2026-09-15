@@ -231,6 +231,7 @@ class ContentRepository:
         )
         self._connection.execute(
             """UPDATE document_index_state SET parse_status='complete', chunk_status='complete',
+               lexical_status='complete', embedding_status='pending', vector_status='pending',
                pipeline_version=?, last_error_code=NULL, updated_at=CURRENT_TIMESTAMP
                WHERE document_id=?""", (pipeline_version, document.id)
         )
