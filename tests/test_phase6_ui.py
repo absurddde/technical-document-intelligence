@@ -27,15 +27,15 @@ from app.ui.workers import FunctionWorker
 
 
 @pytest.mark.parametrize("dark", [True, False], ids=["dark-palette", "light-palette"])
-def test_document_table_text_contrasts_with_application_palette(
+def test_text_widgets_and_document_table_contrast_with_application_palette(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dark: bool,
 ) -> None:
-    """Production styling must preserve readable normal and selected table text."""
+    """White text fields and palette-based tables must stay readable in both themes."""
     from types import SimpleNamespace
 
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtGui import QColor, QPalette
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QTreeWidgetItem
     from app.ui.__main__ import APPLICATION_STYLESHEET
     from app.ui.main_window import MainWindow
     from app.ui.models import DocumentItem
@@ -66,8 +66,26 @@ def test_document_table_text_contrasts_with_application_palette(
     backend = SimpleNamespace(list_documents=lambda: (document,))
     window = MainWindow(backend)
     try:
+        window.question.insertPlainText("Technical question: INS guidance")
+        window.answer.setPlainText("Technical answer: local source evidence")
+        window.source_preview.setPlainText("Source passage: navigation system")
+        window.source_list.addItem("Source document")
+        window.retrieval_tree.addTopLevelItem(QTreeWidgetItem(["Retrieval detail"]))
         window.show()
         application.processEvents()
+        assert window.question.toPlainText() == "Technical question: INS guidance"
+        for widget in (
+            window.question, window.answer, window.source_preview,
+            window.source_list, window.retrieval_tree,
+        ):
+            widget.ensurePolished()
+            colors = widget.palette()
+            for group in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive):
+                assert colors.color(group, roles.Base) == QColor("#ffffff")
+                assert contrast(colors.color(group, roles.Text), colors.color(group, roles.Base)) >= 4.5
+                assert contrast(
+                    colors.color(group, roles.HighlightedText), colors.color(group, roles.Highlight),
+                ) >= 4.5
         table = window.document_table
         assert table.rowCount() == 1
         texts = [table.item(0, column).text() for column in range(4)]

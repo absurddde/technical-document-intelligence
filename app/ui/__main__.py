@@ -28,7 +28,7 @@ APPLICATION_STYLESHEET = """
             border: 1px solid #cbd3da; border-radius: 4px;
         }
         QPlainTextEdit, QTextBrowser, QListWidget, QTreeWidget {
-            background: white;
+            background: white; color: #202020;
         }
     """
 
