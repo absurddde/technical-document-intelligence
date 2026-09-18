@@ -1,55 +1,103 @@
-# Technical Document Intelligence
+﻿# Technical Document Intelligence
 
-Fully local Windows desktop document retrieval and grounded synthesis for PDF and DOCX archives.
+A fully local Windows desktop RAG application for querying technical PDF and DOCX documents.
 
-## Windows distribution
+The project focuses on offline technical document analysis, source traceability, and privacy. Documents are processed locally and answers are generated from retrieved passages with file and page references.
 
-The supported packaging target is Windows 10/11 64-bit. A 64-bit CPU, 16 GB RAM, and an SSD are recommended. CPU-only operation is supported; Qwen3 CPU responses can take several minutes.
+## Features
 
-Run `TechnicalDocumentIntelligence.exe` from the distribution folder. VS Code, the source repository, and a developer Python installation are not intended to be required by the packaged application.
+- PDF and DOCX ingestion
+- Offline OCR with Tesseract
+- Multilingual embeddings with BGE-M3
+- FAISS vector search
+- SQLite FTS5 lexical search
+- Hybrid semantic + lexical retrieval
+- Reciprocal Rank Fusion (RRF)
+- Local Qwen3-8B inference with llama.cpp
+- Source and page-level citations
+- Evidence passage inspection
+- Insufficient-evidence detection
+- Incremental indexing
+- PySide6 Windows desktop interface
+- Packaged Windows executable support
+- Offline operation
 
-Models are deliberately external and are never downloaded at runtime:
+## Tech Stack
 
-```text
-TechnicalDocumentIntelligence/
-  TechnicalDocumentIntelligence.exe
-  _internal/
-  config/config.toml
-  models/embedding/bge-m3/
-  models/llm/qwen3-8b/Qwen3-8B-Q4_K_M.gguf
-```
+- Python 3.11
+- PySide6
+- SQLite / FTS5
+- FAISS
+- BGE-M3
+- Qwen3-8B GGUF
+- llama-cpp-python
+- Tesseract OCR
+- PyInstaller
+- pytest
 
-Copy the complete BGE-M3 directory and Qwen3 GGUF to those locations before indexing or asking questions. Do not move files out of `_internal`.
+## Local Models
 
-Tesseract OCR is required only for scanned PDFs. This release supports either an existing Tesseract installation (PATH or the standard Windows install directory) or a separately supplied `Tesseract-OCR` folder beside the EXE. Turkish (`tur`) and English (`eng`) language data must be installed. Tesseract binaries are not included by this project.
+Model files are not included in this repository because of their size.
 
-## Use
+Expected structure:
 
-Open the application, add PDF/DOCX files, and run indexing. Enter a technical question after indexing to retrieve local evidence and generate a cited Turkish answer. Original documents remain in their selected locations and are not modified.
+    models/
+      embedding/
+        bge-m3/
+      llm/
+        qwen3-8b/
+          Qwen3-8B-Q4_K_M.gguf
 
-All runtime processing is offline. The application has no cloud API, login, telemetry, analytics, remote database, or automatic model download. Mutable state is stored under `%LOCALAPPDATA%\TechnicalDocumentIntelligence\`:
+## Source Documents
 
-- `database/app.db`: document metadata and lexical/embedding state
-- `indexes/`: FAISS artifacts
-- `cache/`: parsed-document cache
-- `logs/app.log`: bounded rotating operational logs
+The PDF and DOCX documents used during development are not included in this repository.
 
-If an original document is moved or deleted, add or rescan the current file location. A missing FAISS artifact can be recreated by indexing again. A changed embedding model fingerprint causes embeddings/index state to be rebuilt rather than silently reused. Interrupted indexing retains committed SQLite state and can be safely rerun. Do not delete the LOCALAPPDATA folder unless intentionally resetting all application state; back it up before manual recovery from database corruption.
+Users are expected to provide their own local documents.
 
-Known limitations: models and Tesseract must be supplied separately; DOCX page numbers are not always available; CPU generation is slow; clean-machine operation must be validated on the target Windows configuration.
+PDF and DOCX files are ignored by Git to prevent research papers, private documents, or licensed material from being committed accidentally.
 
-## Development and build
+## Installation
 
-Development mode remains:
+Clone the repository:
 
-```powershell
-D:\proje_Staj\.venv\Scripts\python.exe -m app.ui
-```
+    git clone https://github.com/absurddde/technical-document-intelligence.git
+    cd technical-document-intelligence
 
-After installing PyInstaller in the project venv, build an onedir distribution with:
+Create and activate a virtual environment:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build_windows.ps1 -Clean
-```
+    python -m venv .venv
+    .\.venv\Scripts\Activate.ps1
 
-Output is written to `dist\TechnicalDocumentIntelligence\`; large models, user data, pilot documents/reports, and development caches are excluded.
+Install dependencies:
+
+    pip install -r requirements.txt
+
+Tesseract OCR and the required local model files must also be installed separately.
+
+## Run
+
+    python -m app.ui
+
+## Build for Windows
+
+    .\scripts\build_windows.ps1
+
+## Testing
+
+    pytest -q
+
+## Current Status
+
+This project is a working MVP.
+
+Core document ingestion, indexing, retrieval, local generation, citations, insufficient-evidence handling, and Windows packaging are functional.
+
+## Known Limitations
+
+- Domain-specific cross-language terminology can still cause retrieval failures, especially acronym pairs such as `İHA / İKA` and `UAV / UGV`.
+- Qwen3-8B CPU inference can take several minutes depending on the retrieved context.
+- Large local model files are not distributed through this repository.
+
+## Goal
+
+This project is designed as a local technical document intelligence system rather than a general-purpose chatbot. Answers are intended to remain grounded in and traceable to the user's own documents.
