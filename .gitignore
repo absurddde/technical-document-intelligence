@@ -7,3 +7,6 @@ models/
 *.egg-info/
 build/
 dist/
+
+*.pdf
+*.docx
